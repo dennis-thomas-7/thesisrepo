@@ -1,0 +1,490 @@
+---
+title: "ST606 Data Visualizations"
+author: 'Dennis Thomas Veliyath'
+date: "12/04/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+<!-- packages used -->
+
+```{r packages,warning=FALSE,message=FALSE}
+library(stringr)
+library(tidyr)
+library(forcats)
+library(dplyr)
+library(countrycode)
+library(ggplot2)
+library(showtext)
+library(tidyverse)
+library(gganimate)
+```
+
+## Loading the data
+
+```{r loadingdata,warning=FALSE,message=FALSE}
+
+#Loading birth data and storing in a temp variable
+
+birth_data <- readr::read_csv('~/VSA01.20220412164432.csv')
+temp_birth_data<-birth_data
+
+#Loading boy names data and storing in a temp variable
+
+boys_names_data<-readr::read_csv('~/VSA50.20220412164235.csv')
+temp_boys_data<-boys_names_data
+
+#Loading girl names data and storing in a temp variable
+
+girls_names_data<-readr::read_csv('~/VSA60.20220412164418.csv')
+temp_girls_data<-girls_names_data
+
+font_add_google("Quattrocento Sans", "Quattrocento Sans")
+showtext_auto()
+windows()
+
+```
+
+### 1. Plotting to display patterns of a particular name over the years.
+
+
+```{r}
+
+# Plot to display trend of Dennis over the years based on occurences
+
+graph_data <- temp_boys_data %>% filter( Names== "Dennis", STATISTIC == "VSA50C01") %>% drop_na(VALUE) 
+
+gg_count_title <- expression(paste("The name ", italic(bold("Dennis")), " over the years based on number of occurences"))
+
+ggplot(graph_data, aes(x=Year, y=VALUE))+  
+  geom_bar(stat="identity",fill = "darkblue") +
+  theme_classic() + 
+  labs(title = gg_count_title, x = "Year", y = "Count")+
+  scale_x_continuous(breaks = graph_data$Year, labels = graph_data$Year)+ 
+  scale_y_continuous(breaks = graph_data$VALUE, labels = graph_data$VALUE) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1,size = 22),axis.text.y = element_text(size = 22),axis.title.x = element_text(size = 22),axis.title.y = element_text(size = 22), plot.title = element_text(family="Quattrocento Sans", hjust = 0.5,size = 30))
+
+```
+
+
+```{r}
+
+# Plot to display trend of Dennis over the years based on rank
+
+graph_rank_data <- temp_boys_data %>% filter( Names== "Dennis", STATISTIC == "VSA50C02") %>% drop_na(VALUE) 
+
+gg_rank_title <- expression(paste("The name ", italic(bold("Dennis")), " over the years based on rank"))
+
+ggplot(graph_rank_data, aes(x=Year, y=VALUE))+  
+  geom_bar(stat="identity",fill = "darkblue") +
+  theme_classic() + 
+  labs(title = gg_rank_title, x = "Years", y = "Rank")+
+  scale_x_continuous(breaks = graph_rank_data$Year, labels = graph_rank_data$Year)+ 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1,size = 22),axis.text.y = element_text(size = 22),axis.title.x = element_text(size = 22),axis.title.y = element_text(size = 22), plot.title = element_text(family="Quattrocento Sans", hjust = 0.5,size = 30))
+
+
+```
+
+### 2: Top 10 names over the years
+
+```{r,warning=FALSE}
+
+#Top Boy names over the years
+count_data <- temp_boys_data %>% filter(STATISTIC == "VSA50C01",Year=="1964") %>% drop_na(VALUE)
+count_test_data <- temp_boys_data %>% filter(STATISTIC == "VSA50C01") %>% drop_na(VALUE)
+sort_data<-count_data[with(count_data,order(-VALUE)),]
+sort_data <- sort_data[1:10,]
+
+
+name_formatted <- count_test_data %>%
+  group_by(Year) %>%
+  mutate(rank = rank(-VALUE),
+         Value_rel = VALUE/VALUE[rank==1],
+         Value_lbl = paste0(" ",round(VALUE/1e9))) %>%
+  group_by(Names) %>%
+  filter(rank <=10) %>%
+  ungroup()
+
+
+staticplot = ggplot(name_formatted, aes(rank, group = Names,
+                fill = as.factor(Names), color = as.factor(Names))) +
+  geom_tile(aes(y = VALUE/2,
+                height = VALUE,
+                width = 0.9), alpha = 0.8, color = NA) +
+  geom_text(aes(y = 0, label = paste(Names, " ")), vjust = 0.2, hjust = 1) +
+  geom_text(aes(y=VALUE,label = VALUE, hjust=0)) +
+  coord_flip(clip = "off", expand = FALSE) +
+  scale_y_continuous(labels = scales::comma) +
+  scale_x_reverse() +
+  guides(color = FALSE, fill = FALSE) +
+  theme(axis.line=element_blank(),
+        axis.text.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks=element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_blank(),
+        legend.position="none",
+        panel.background=element_blank(),
+        panel.border=element_blank(),
+        panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        panel.grid.major.x = element_line( size=.1, color="grey" ),
+        panel.grid.minor.x = element_line( size=.1, color="grey" ),
+        plot.title=element_text(size=25, hjust=0.5, face="bold", colour="grey", vjust=1),
+        plot.subtitle=element_text(size=18, hjust=0.5, face="italic", color="grey"),
+        plot.caption =element_text(size=10, hjust=0.5, face="italic", color="grey", vjust = 1),
+        plot.background=element_blank(),
+        plot.margin = ggplot2::margin(4,4, 4, 8, "cm"))
+
+anim = staticplot + transition_states(Year, transition_length = 8, state_length = 1) +
+  view_follow(fixed_x = TRUE)  +
+  labs(title = 'Top Boy Names of the Year : {closest_state}\n',
+       caption  = "\nMost common names over the years")
+
+animate(anim, nframes = 600, renderer = gifski_renderer("gganim.gif"), width = 1200, height = 1000, fps = 15)
+
+```
+
+```{r,warning=FALSE}
+
+#Top Girl names over the years
+
+count_girlstest_data <- temp_girls_data %>% filter(STATISTIC == "VSA60C01") %>% drop_na(VALUE)
+sort_data<-count_data[with(count_data,order(-VALUE)),]
+sort_data <- sort_data[1:10,]
+
+
+name_girl_formatted <- count_girlstest_data %>%
+  group_by(Year) %>%
+  mutate(rank = rank(-VALUE),
+         Value_rel = VALUE/VALUE[rank==1],
+         Value_lbl = paste0(" ",round(VALUE/1e9))) %>%
+  group_by(Names) %>%
+  filter(rank <=10) %>%
+  ungroup()
+
+
+staticgirlplot = ggplot(name_girl_formatted, aes(rank, group = Names,
+                fill = as.factor(Names), color = as.factor(Names))) +
+  geom_tile(aes(y = VALUE/2,
+                height = VALUE,
+                width = 0.9), alpha = 0.8, color = NA) +
+  geom_text(aes(y = 0, label = paste(Names, " ")), vjust = 0.2, hjust = 1) +
+  geom_text(aes(y=VALUE,label = VALUE, hjust=0)) +
+  coord_flip(clip = "off", expand = FALSE) +
+  scale_y_continuous(labels = scales::comma) +
+  scale_x_reverse() +
+  guides(color = FALSE, fill = FALSE) +
+  theme(axis.line=element_blank(),
+        axis.text.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks=element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_blank(),
+        legend.position="none",
+        panel.background=element_blank(),
+        panel.border=element_blank(),
+        panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        panel.grid.major.x = element_line( size=.1, color="grey" ),
+        panel.grid.minor.x = element_line( size=.1, color="grey" ),
+        plot.title=element_text(size=25, hjust=0.5, face="bold", colour="grey", vjust=1),
+        plot.subtitle=element_text(size=18, hjust=0.5, face="italic", color="grey"),
+        plot.caption =element_text(size=10, hjust=0.5, face="italic", color="grey", vjust = 1),
+        plot.background=element_blank(),
+        plot.margin = ggplot2::margin(4,4, 4, 8, "cm"))
+
+animgirl = staticgirlplot + transition_states(Year, transition_length = 8, state_length = 1) +
+  view_follow(fixed_x = TRUE)  +
+  labs(title = 'Top Girl Names of the Year : {closest_state}\n',
+       caption  = "\nMost common girl names over the years")
+
+animate(animgirl, nframes = 600, renderer = gifski_renderer("gganimgirl.gif"), width = 1200, height = 1000, fps = 15)
+
+```
+
+
+### 3: Registered births over the years
+
+```{r}
+
+# No of total births registered over the years
+
+birth_temp_data <- temp_birth_data %>% filter(Sex=="Both sexes") %>% drop_na(VALUE) 
+birth_male_temp_data <- temp_birth_data %>% filter(Sex=="Male") %>% drop_na(VALUE) 
+birth_female_temp_data <- temp_birth_data %>% filter(Sex=="Female") %>% drop_na(VALUE) 
+
+gg_birth_title <- expression(paste("The number of total births over the years (1910-2020)"))
+gg_male_birth_title <- expression(paste("The number of male births over the years (1910-2020)"))
+gg_female_birth_title <- expression(paste("The number of female births over the years (1910-2020)"))
+
+ggplot(birth_temp_data, aes(x=Year, y=VALUE))+  
+  geom_bar(stat="identity",fill = "#000000") +
+  theme_classic() + 
+  labs(title = gg_birth_title, x = "Years", y = "Count")+
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1,size = 18),axis.text.y = element_text(size = 22),axis.title.x = element_text(size = 22),axis.title.y = element_text(size = 22), plot.title = element_text(family="Quattrocento Sans", hjust = 0.5,size = 30))
+
+```
+
+```{r}
+min(birth_temp_data[,8])
+min_val_year <- birth_temp_data[birth_temp_data$VALUE == 48255, "Year"]
+```
+
+
+Lowest births recorded was in 1994 with only 48255 births(both sexes). This was due to the 1980-1987 long recession which lead to poor living conditions throughout the mid 1990's. The recession also cause a majority of people to emigrate from Ireland in search of a better life.
+
+
+
+
+## Male births over the years
+
+```{r}
+
+# No of total male births registered over the years
+
+ggplot(birth_male_temp_data, aes(x=Year, y=VALUE))+  
+  geom_bar(stat="identity",fill = "darkblue") +
+  theme_classic() + 
+  labs(title = gg_male_birth_title, x = "Years", y = "Count")+
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1,size = 18),axis.text.y = element_text(size = 22),axis.title.x = element_text(size = 22),axis.title.y = element_text(size = 22), plot.title = element_text(family="Quattrocento Sans", hjust = 0.5,size = 30))
+
+```
+
+## Female Births over the years
+
+```{r}
+
+# No of total female births registered over the years
+
+ggplot(birth_female_temp_data, aes(x=Year, y=VALUE))+  
+  geom_bar(stat="identity",fill = "deeppink") +
+  theme_classic() + 
+  labs(title = gg_female_birth_title, x = "Years", y = "Count")+
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1,size = 18),axis.text.y = element_text(size = 22),axis.title.x = element_text(size = 22),axis.title.y = element_text(size = 22), plot.title = element_text(family="Quattrocento Sans", hjust = 0.5,size = 30))
+
+```
+
+
+### 4: Total names(count>3) over the years
+
+```{r}
+
+# Total boy's names vs years
+
+count_boys_test_data<- temp_boys_data %>% filter(STATISTIC == "VSA50C01") %>% drop_na(VALUE)
+
+ggplot(count_boys_test_data, aes(x=Year))+  
+  geom_bar(stat="count",fill = "darkblue") +
+  theme_classic() + 
+  labs(title = "Total Boy's Names vs Years", x = "Years", y = "Count")+
+  scale_x_continuous(breaks = scales::breaks_width(4))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1,size = 22),axis.text.y = element_text(size = 22),axis.title.x = element_text(size = 22),axis.title.y = element_text(size = 22), plot.title = element_text(family="Quattrocento Sans", hjust = 0.5,size = 30))
+
+```
+
+
+
+```{r}
+
+# Total girl's names vs years
+
+count_girls_test_data <- temp_girls_data %>% filter(STATISTIC == "VSA60C01") %>% drop_na(VALUE) 
+max(count_girls_test_data$VALUE)
+ggplot(count_girls_test_data, aes(x=Year))+  
+  geom_bar(stat="count",fill = "deeppink") +
+  theme_classic() + 
+  labs(title = "Total Girl's Names vs Years", x = "Years", y = "Count")+
+  scale_x_continuous(breaks = scales::breaks_width(4))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1,size = 22),axis.text.y = element_text(size = 22),axis.title.x = element_text(size = 22),axis.title.y = element_text(size = 22), plot.title = element_text(family="Quattrocento Sans", hjust = 0.5,size = 30))
+```
+
+## Total boys and girls named vs Total boys and girls registered births over the years
+
+
+```{r}
+
+birth_male_temp_data_new<- birth_male_temp_data[birth_male_temp_data$Year >= '1964',]
+
+birth_female_temp_data_new<- birth_female_temp_data[birth_female_temp_data$Year >= '1964',]
+
+df_boys<- count_boys_test_data %>% group_by(Year) %>%
+  summarise(VALUE = sum(VALUE))
+
+df_girls<- count_girls_test_data %>% group_by(Year) %>%
+  summarise(VALUE = sum(VALUE))
+
+combined_plot<- ggplot() +
+      # orange plot
+      geom_point(data=birth_male_temp_data_new, aes(x=Year, y=VALUE, color="boy_births", shape = "boy_births" ),size=1.5) +
+      # green plot
+      geom_point(data=birth_female_temp_data_new, aes(x=Year, y=VALUE, color="girl_births", shape = "girl_births"), size=1.5) +
+      # blue plot
+      geom_point(data=df_boys, aes(x=Year, y=VALUE, color="boys_named", shape= "boys_named"), size=1.5) +
+      #pink plot
+      geom_point(data=df_girls, aes(x=Year, y=VALUE, color="girls_named", shape="girls_named"), size=1.5) + 
+  
+      scale_x_continuous(breaks = scales::breaks_width(4)) +
+  
+      scale_y_continuous(breaks = scales::breaks_width(2500)) +
+  
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=0.5,size = 12))+
+  
+      scale_colour_manual(name="legend", values = c("boy_births"= "darkblue", "girl_births"="green","boys_named"="orange", "girls_named"="deeppink")) +
+  
+      scale_shape_manual(name="legend", values = c("boy_births" = 15, "girl_births" = 16,"boys_named"=15, "girls_named"=16 ))
+
+combined_plot
+
+```
+
+## Most Used Letter for boys over the Years
+
+
+```{r}
+
+
+# Most used letter for boys over the years
+
+letter_data <- temp_boys_data %>% filter(STATISTIC == "VSA50C01")%>% drop_na(VALUE)
+
+# Adding new column and assigning values
+letter_data <- letter_data %>% add_column(new_col = NA)
+names(letter_data)[9]<- 'Letter_group'
+
+letter_data$Letter_group[startsWith(letter_data$Names,"A")] <- "A"
+letter_data$Letter_group[startsWith(letter_data$Names,"B")] <- "B"
+letter_data$Letter_group[startsWith(letter_data$Names,"C")] <- "C"
+letter_data$Letter_group[startsWith(letter_data$Names,"D")] <- "D"
+letter_data$Letter_group[startsWith(letter_data$Names,"E")] <- "E"
+letter_data$Letter_group[startsWith(letter_data$Names,"F")] <- "F"
+letter_data$Letter_group[startsWith(letter_data$Names,"G")] <- "G"
+letter_data$Letter_group[startsWith(letter_data$Names,"H")] <- "H"
+letter_data$Letter_group[startsWith(letter_data$Names,"I")] <- "I"
+letter_data$Letter_group[startsWith(letter_data$Names,"J")] <- "J"
+letter_data$Letter_group[startsWith(letter_data$Names,"K")] <- "K"
+letter_data$Letter_group[startsWith(letter_data$Names,"L")] <- "L"
+letter_data$Letter_group[startsWith(letter_data$Names,"M")] <- "M"
+letter_data$Letter_group[startsWith(letter_data$Names,"N")] <- "N"
+letter_data$Letter_group[startsWith(letter_data$Names,"O")] <- "O"
+letter_data$Letter_group[startsWith(letter_data$Names,"P")] <- "P"
+letter_data$Letter_group[startsWith(letter_data$Names,"Q")] <- "Q"
+letter_data$Letter_group[startsWith(letter_data$Names,"R")] <- "R"
+letter_data$Letter_group[startsWith(letter_data$Names,"S")] <- "S"
+letter_data$Letter_group[startsWith(letter_data$Names,"T")] <- "T"
+letter_data$Letter_group[startsWith(letter_data$Names,"U")] <- "U"
+letter_data$Letter_group[startsWith(letter_data$Names,"V")] <- "V"
+letter_data$Letter_group[startsWith(letter_data$Names,"W")] <- "W"
+letter_data$Letter_group[startsWith(letter_data$Names,"X")] <- "X"
+letter_data$Letter_group[startsWith(letter_data$Names,"Y")] <- "Y"
+letter_data$Letter_group[startsWith(letter_data$Names,"Z")] <- "Z"
+
+letter_data<- letter_data%>% drop_na(Letter_group)
+
+ggplot(letter_data, aes(x=letter_data$Letter_group))+  
+  geom_bar(stat="count",fill = "darkblue") +
+  theme_classic() + 
+  labs(title = "Most Used Letters For Boys Over The Years", x = "Letters", y = "Count")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1,size = 22),axis.text.y = element_text(size = 22),axis.title.x = element_text(size = 22),axis.title.y = element_text(size = 22), plot.title = element_text(family="Quattrocento Sans", hjust = 0.5,size = 30))
+
+
+```
+
+Here we can see that D is the most used initial for first names over the years and X is the least used initial.
+
+## Trend for boy names starting with 'D' over the years 
+
+```{r}
+
+# Trend for boy names starting with 'D' over the years 
+
+starts_with_d <- temp_boys_data %>% filter(STATISTIC == "VSA50C01")%>% drop_na(VALUE)
+names_with_d<-starts_with_d[grepl("^D", starts_with_d$Names), ]
+names_with_d<- names_with_d[,-c(1,2,3,5,7)]
+
+ggplot(names_with_d, aes(x=Year))+  
+  geom_point(stat="count",colour = "darkblue") +
+  theme_classic() + 
+  labs(title = "Trend for boy  names starting with 'D' over the years", x = "Year", y = "Count")+
+  scale_x_continuous(breaks = scales::breaks_width(4))+
+  
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1,size = 22),axis.text.y = element_text(size = 22),axis.title.x = element_text(size = 22),axis.title.y = element_text(size = 22), plot.title = element_text(family="Quattrocento Sans", hjust = 0.5,size = 30))
+
+```
+
+
+## Most used letter for girls over the years
+
+```{r}
+# Most Used Letter for girls over the Years
+
+letter_data_girls <- temp_girls_data %>% filter(STATISTIC == "VSA60C01")%>% drop_na(VALUE)
+
+# Adding new column and assigning values
+
+letter_data_girls <- letter_data_girls %>% add_column(new_col = NA)
+names(letter_data_girls)[9]<- 'Letter_group'
+
+letter_data_girls$Letter_group[startsWith(letter_data_girls$Names,"A")] <- "A"
+letter_data_girls$Letter_group[startsWith(letter_data_girls$Names,"B")] <- "B"
+letter_data_girls$Letter_group[startsWith(letter_data_girls$Names,"C")] <- "C"
+letter_data_girls$Letter_group[startsWith(letter_data_girls$Names,"D")] <- "D"
+letter_data_girls$Letter_group[startsWith(letter_data_girls$Names,"E")] <- "E"
+letter_data_girls$Letter_group[startsWith(letter_data_girls$Names,"F")] <- "F"
+letter_data_girls$Letter_group[startsWith(letter_data_girls$Names,"G")] <- "G"
+letter_data_girls$Letter_group[startsWith(letter_data_girls$Names,"H")] <- "H"
+letter_data_girls$Letter_group[startsWith(letter_data_girls$Names,"I")] <- "I"
+letter_data_girls$Letter_group[startsWith(letter_data_girls$Names,"J")] <- "J"
+letter_data_girls$Letter_group[startsWith(letter_data_girls$Names,"K")] <- "K"
+letter_data_girls$Letter_group[startsWith(letter_data_girls$Names,"L")] <- "L"
+letter_data_girls$Letter_group[startsWith(letter_data_girls$Names,"M")] <- "M"
+letter_data_girls$Letter_group[startsWith(letter_data_girls$Names,"N")] <- "N"
+letter_data_girls$Letter_group[startsWith(letter_data_girls$Names,"O")] <- "O"
+letter_data_girls$Letter_group[startsWith(letter_data_girls$Names,"P")] <- "P"
+letter_data_girls$Letter_group[startsWith(letter_data_girls$Names,"Q")] <- "Q"
+letter_data_girls$Letter_group[startsWith(letter_data_girls$Names,"R")] <- "R"
+letter_data_girls$Letter_group[startsWith(letter_data_girls$Names,"S")] <- "S"
+letter_data_girls$Letter_group[startsWith(letter_data_girls$Names,"T")] <- "T"
+letter_data_girls$Letter_group[startsWith(letter_data_girls$Names,"U")] <- "U"
+letter_data_girls$Letter_group[startsWith(letter_data_girls$Names,"V")] <- "V"
+letter_data_girls$Letter_group[startsWith(letter_data_girls$Names,"W")] <- "W"
+letter_data_girls$Letter_group[startsWith(letter_data_girls$Names,"X")] <- "X"
+letter_data_girls$Letter_group[startsWith(letter_data_girls$Names,"Y")] <- "Y"
+letter_data_girls$Letter_group[startsWith(letter_data_girls$Names,"Z")] <- "Z"
+
+letter_data_girls<- letter_data_girls%>% drop_na(Letter_group)
+
+ggplot(letter_data_girls, aes(x=letter_data_girls$Letter_group))+  
+  geom_bar(stat="count",fill = "deeppink") +
+  theme_classic() + 
+  labs(title = "Most Used Letters for Girls Over The Years", x = "Letters", y = "Count")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1,size = 22),axis.text.y = element_text(size = 22),axis.title.x = element_text(size = 22),axis.title.y = element_text(size = 22), plot.title = element_text(family="Quattrocento Sans", hjust = 0.5,size = 30))
+
+```
+
+
+## Trend for girl names starting with 'A' over the years 
+
+```{r}
+
+# Trend for girl names starting with 'A' over the years 
+
+starts_with_a <- temp_girls_data %>% filter(STATISTIC == "VSA60C01")%>% drop_na(VALUE)
+names_with_a<-starts_with_a[grepl("^A", starts_with_a$Names), ]
+names_with_a<- names_with_a[,-c(1,2,3,5,7)]
+
+ggplot(names_with_a, aes(x=Year))+  
+  geom_point(stat="count",colour = "deeppink") +
+  theme_classic() + 
+  labs(title = "Trend for girl names starting with 'A' over the years", x = "Year", y = "Count")+
+  scale_x_continuous(breaks = scales::breaks_width(4))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1,size = 22),axis.text.y = element_text(size = 22),axis.title.x = element_text(size = 22),axis.title.y = element_text(size = 22), plot.title = element_text(family="Quattrocento Sans", hjust = 0.5,size = 30))
+
+
+
+```
+
+

@@ -1,0 +1,96 @@
+---
+title: "ST606 Gender Prediction Model"
+author: 'Dennis Thomas Veliyath: 21250764'
+date: "09/08/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+<!-- packages used -->
+
+```{r packages,warning=FALSE,message=FALSE}
+library(caTools)
+library(randomForest)
+```
+
+## Loading the data
+
+```{r loadingdata,warning=FALSE,message=FALSE}
+
+# Loading birth data and storing in a temp variable
+
+birth_data <- readr::read_csv('~/VSA01.20220412164432.csv')
+temp_birth_data<-birth_data
+
+# Loading boy names data and storing in a temp variable
+
+boys_names_data<-readr::read_csv('~/VSA50.20220412164235.csv')
+temp_boys_data<-boys_names_data
+
+# Loading girl names data and storing in a temp variable
+
+girls_names_data<-readr::read_csv('~/VSA60.20220412164418.csv')
+temp_girls_data<-girls_names_data
+
+```
+
+
+## Gender Prediction using Random Forest
+
+```{r}
+
+# Combining the datasets for prediction
+
+new_temp_birth_data <- temp_birth_data[!(temp_birth_data$Year<1964),]
+new_temp_boys_data <- temp_boys_data %>% filter(STATISTIC == "VSA50C01") %>% drop_na(VALUE)
+new_temp_boys_data <- new_temp_boys_data[!(new_temp_boys_data$Year>2020),]
+new_temp_girls_data <- temp_girls_data %>% filter(STATISTIC == "VSA60C01") %>% drop_na(VALUE)
+new_temp_girls_data <- new_temp_girls_data[!(new_temp_girls_data$Year>2020),]
+jointnamesdataset <- new_temp_boys_data %>% full_join(new_temp_girls_data)
+jointbirthnames <- jointnamesdataset %>% full_join(new_temp_birth_data)
+
+# Adding column 'Gender' to the combined dataset
+
+
+jointnamesdataset <- jointnamesdataset %>% add_column(new_col = NA)
+names(jointnamesdataset)[10]<- 'Gender'
+jointnamesdataset$Gender[jointnamesdataset$STATISTIC=="VSA50C01"] <- "Male"
+jointnamesdataset$Gender[jointnamesdataset$STATISTIC=="VSA60C01"] <- "Female"
+str(jointnamesdataset)
+jointnamesdataset$Gender <- as.factor(ifelse(jointnamesdataset$Gender == "Male", 'M', 'F'))
+
+# Removing unnecessary columns 
+
+newnamedata<- jointnamesdataset[-c(1,2,3)]
+newnamedata<- newnamedata[-c(2,4,6)]
+
+# Selecting only required columns to a temp dataset
+temp <- newnamedata %>% select(Names,Gender,VALUE,Year)
+
+#downsizing the data 
+newnamedata <- temp[rep(1:nrow(temp),round(temp[["VALUE"]]/5)), ]
+
+
+# Splitting data into test and train
+
+ind <- sample(2, nrow(newnamedata), replace=TRUE, prob=(c(0.7, 0.3)))
+set.seed(123)
+train <- newnamedata[ind==1,]
+test <- newnamedata[ind==2,]
+RFM = randomForest(Gender~Names, data = test, importance =TRUE, random_state= 42)
+
+gender_pred = predict(RFM,test)
+test$gender_pred = gender_pred
+
+# Calculating confusion matrix and accuracy
+
+CFM = table(test$Gender,test$gender_pred)
+CFM
+
+accuracy = sum(diag(CFM)/sum(CFM))
+accuracy
+
+```
